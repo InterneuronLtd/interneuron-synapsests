@@ -34,9 +34,9 @@
 //You should have received a copy of the GNU General Public License
 //along with this program.If not, see<http://www.gnu.org/licenses/>.
 
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Synapse.STS.Models;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 
 namespace Synapse.STS.Data
 {

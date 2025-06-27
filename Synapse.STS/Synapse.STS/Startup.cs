@@ -48,19 +48,20 @@ using System.Reflection;
 using Synapse.STS.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
-using IdentityServer4.EntityFramework.DbContexts;
+using Duende.IdentityServer.EntityFramework.DbContexts;
 using System.Security.Claims;
 using IdentityModel;
-using IdentityServer4.EntityFramework.Mappers;
+using Duende.IdentityServer.EntityFramework.Mappers;
 using System.IO;
 using Microsoft.AspNetCore.Authentication;
-using IdentityServer4;
-using IdentityServer4.Services;
+using Duende.IdentityServer;
+using Duende.IdentityServer.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Globalization;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Synapse.STS
 {
@@ -87,42 +88,62 @@ namespace Synapse.STS
             string connectionString = _configuration["Settings:ConnectionString"];//Configuration.GetConnectionString("DefaultConnection");
             var migrationsAssembly = typeof(Startup).GetTypeInfo().Assembly.GetName().Name;
 
-     //       X509Store store = new X509Store(StoreLocation.CurrentUser);
-              X509Certificate2 cer = new X509Certificate2();
-     //       try
-     //       {
-     //           string tb = _configuration["Settings:SigningCredentialsTP"];
-         //       store.Open(OpenFlags.ReadOnly);
-         //       X509Certificate2Collection col = store.Certificates.Find(X509FindType.FindByThumbprint,
-         //         tb, false);
-         //       if (col == null || col.Count == 0)
-     //           {
 
-     //           }
-         //       else { cer = col[0]; }
 
-            //}
-            //finally
-            //{
-         //       store = null;
-     //       }
+            var useLocalMachineStore = _configuration["Settings:X509_UseLocalMachineStore"];
+            var storelocation = useLocalMachineStore == "true" ? StoreLocation.LocalMachine : StoreLocation.CurrentUser;
 
+            X509Store store = new X509Store(storelocation);
+            X509Certificate2 cer = new X509Certificate2();
+            try
+            {
+                string tb = _configuration["Settings:SigningCredentialsTP"];
+                store.Open(OpenFlags.ReadOnly);
+                X509Certificate2Collection col = store.Certificates.Find(X509FindType.FindByThumbprint,
+                  tb, false);
+                if (col == null || col.Count == 0)
+                {
+
+                }
+                else { cer = col[0]; }
+
+            }
+            finally
+            {
+                store = null;
+            }
 
             services.AddDbContext<SynapseDbContext>(options =>
                 options.UseNpgsql(connectionString));
 
+            var lockouttime = double.Parse(_configuration["Settings:AccountLockout_TimespanMinutes"]);
+            var maxloginattempts = int.Parse(_configuration["Settings:AccountLockout_MaxLoginAttempts"]);
 
-            services.AddIdentity<SynapseUser, IdentityRole>()
+            services.AddIdentity<SynapseUser, IdentityRole>(options =>
+            {
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = maxloginattempts;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(lockouttime);
+            })
                 .AddEntityFrameworkStores<SynapseDbContext>()
                 .AddDefaultTokenProviders();
 
             services.AddDbContext<SynapseRoleBasedClaimsContext>(options =>
                 options.UseNpgsql(connectionString));
 
+            services.AddDbContext<DataProtectionKeyContext>(options =>
+               options.UseNpgsql(connectionString));
 
+
+            services.AddDataProtection()
+                .PersistKeysToDbContext<DataProtectionKeyContext>()
+                .SetApplicationName(migrationsAssembly);
 
             services.AddMvc();
-
+            services.AddControllers(options =>
+            {
+                options.EnableEndpointRouting = false;
+            });
             services.Configure<IISOptions>(iis =>
             {
                 iis.AuthenticationDisplayName = "Windows";
@@ -222,8 +243,17 @@ namespace Synapse.STS
 
                 options.ExpireTimeSpan = TimeSpan.FromMinutes(double.Parse(_configuration["Settings:CookieExpirationTimeout"]));
                 options.SlidingExpiration = bool.Parse(_configuration["Settings:SlidingExpiration"]);
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+               // options.Cookie.SameSite = SameSiteMode.Lax;
 
             });
+
+            // Customize the antiforgery options
+            //services.Configure<AntiforgeryOptions>(options =>
+            //{
+            //    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Set cookie to be Secure
+            //});
+
         }
 
         private Task HandleRemoteFailure(RemoteFailureContext context)
@@ -240,7 +270,7 @@ namespace Synapse.STS
 
         private async Task OnTicketReceived(TicketReceivedContext ticketReceivedContext)
         {
-            // Only one identity supported by the current implementation of IdentityServer4
+            // Only one identity supported by the current implementation of Duende.IdentityServer
             if (ticketReceivedContext.Principal.Identities.Count() != 1) throw new InvalidOperationException("only a single identity supported");
 
             var oldIdentity = ticketReceivedContext.Principal.Identity as ClaimsIdentity;
@@ -261,13 +291,17 @@ namespace Synapse.STS
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                app.UseDatabaseErrorPage();
 
             }
             else
             {
                 app.UseExceptionHandler("/Home/Error");
             }
+            app.UseHttpsRedirection();
+            app.UseCookiePolicy(new CookiePolicyOptions
+            {
+                Secure = CookieSecurePolicy.Always // Mark all cookies as secure
+            });
             var forwardOptions = new ForwardedHeadersOptions
             {
                 ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,

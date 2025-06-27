@@ -1,0 +1,186 @@
+﻿body button#btnLogin {
+    background-color: #FEFF00 !important;
+    border-color: #FEFF00 !important;
+    color: black !important;
+}
+
+body div#loginSection {
+    background-color: white !important;
+    color: black !important;
+    height: 95rem !important;
+    padding: 25rem !important;
+    width: 92.5rem !important;
+}
+
+body div#adaptAndLiveSection {
+    background-color: #002656 !important;
+    color: white !important;
+    height: 95rem !important;
+}
+
+/*@media screen and (min-width: 768px) {
+    body div#loginSection {
+        background-color: white !important;
+        color: black !important;
+        height: 95rem !important;
+        padding: 25rem !important;
+        width: 92.5rem !important;
+    }
+
+    body div#adaptAndLiveSection {
+        background-color: #002656 !important;
+        color: white !important;
+        height: 95rem !important;
+    }
+}
+
+@media screen and (min-width: 1024px) {
+    body div#loginSection {
+        background-color: white !important;
+        color: black !important;
+        height: 95rem !important;
+        padding: 25rem !important;
+        width: 92.5rem !important;
+    }
+
+    body div#adaptAndLiveSection {
+        background-color: #002656 !important;
+        color: white !important;
+        height: 95rem !important;
+    }
+}
+
+@media screen and (min-width: 1200px) {
+    body div#loginSection {
+        background-color: white !important;
+        color: black !important;
+        height: 95rem !important;
+        padding: 25rem !important;
+        width: 92.5rem !important;
+    }
+
+    body div#adaptAndLiveSection {
+        background-color: #002656 !important;
+        color: white !important;
+        height: 95rem !important;
+    }
+}*/
+
+@media (-webkit-device-pixel-ratio: 1.1) {
+    * {
+        zoom: 0.985;
+        font-size: 16px;
+    }
+
+    input[type="text"], input[type="password"] {
+        height: 40px;
+        font-size: 16px;
+    }
+
+    input, input::placeholder {
+        font-size: 16px;
+    }
+}
+
+@media (-webkit-device-pixel-ratio: 1.25) {
+    * {
+        zoom: 0.96;
+        font-size: 20px;
+    }
+
+    input[type="text"], input[type="password"] {
+        height: 45px;
+        font-size: 20px;
+    }
+
+    input, input::placeholder {
+        font-size: 20px;
+    }
+}
+
+@media (-webkit-device-pixel-ratio: 1.5) {
+    * {
+        zoom: 0.94;
+        font-size: 24px;
+    }
+
+    input[type="text"], input[type="password"] {
+        height: 50px;
+        font-size: 24px;
+    }
+
+    input, input::placeholder {
+        font-size: 24px;
+    }
+}
+
+@media (-webkit-device-pixel-ratio: 1.75) {
+    * {
+        zoom: 0.92;
+        font-size: 28px;
+    }
+
+    input[type="text"], input[type="password"] {
+        height: 60px;
+        font-size: 28px;
+    }
+
+    input, input::placeholder {
+        font-size: 28px;
+    }
+}
+
+body a {
+    color: black !important;
+}
+
+body {
+    background-color: white !important;
+    margin-top: 0 !important;
+}
+
+body label#adaptAndLiveUserName, label#adaptAndLivePassword {
+    font-weight: normal !important;
+}
+
+body div.body-content {
+    width: 100% !important;
+    padding: 0 !important;
+}
+
+body div#dvCenter {
+    position: relative;
+    height: 100vh;
+}
+
+body div#loginPage {
+    width: 100%;
+    height: 100vh;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%,-50%);
+}
+
+body div#dvFacingIss{
+    margin-top: 25px !important;
+}
+
+.outrDv {
+    height: 33%;
+    position: relative;
+}
+
+.outerDv {
+    height: 66%;
+    position: relative;
+}
+
+.inrDv {
+    width: 100%;
+    margin: 0;
+    position: absolute;
+    top: 50%;
+    -ms-transform: translateY(-50%);
+    transform: translateY(-50%);
+}

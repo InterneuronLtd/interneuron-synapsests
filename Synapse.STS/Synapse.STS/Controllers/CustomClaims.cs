@@ -34,9 +34,9 @@
 //You should have received a copy of the GNU General Public License
 //along with this program.If not, see<http://www.gnu.org/licenses/>.
 
-using IdentityServer4.Models;
-using IdentityServer4.Services;
-using IdentityServer4.Stores;
+using Duende.IdentityServer.Models;
+using Duende.IdentityServer.Services;
+using Duende.IdentityServer.Stores;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Synapse.STS.Data;
@@ -147,6 +147,33 @@ namespace Synapse.STS
                     {
                         context.IssuedClaims.Add(new Claim(_configuration["Settings:SynapseRolesClaimType"], item));
                     }
+                }
+
+
+            }
+            else if (context.Subject.HasClaim("Idp", _configuration["Settings:AADSchemeName"]))
+            {
+                var aadAccName = context.Subject.FindFirst(_configuration["Settings:AADIPUIdClaimType"]).Value;
+
+                List<string> aadgroups = context.Subject.FindAll(_configuration["Settings:AADGroupsClaimType"]).Select(x => x.Value).ToList();
+
+
+                List<string> rolesExternalIdp = _claimsContext.AspNetRoles.
+                                                Where(x => (_claimsContext.UserRolesExternalProviders.
+                                                    Where(u => u.Idp == _configuration["Settings:AADSchemeName"] && (u.ExternalSubjectId.ToLower() == aadAccName.ToLower() || aadgroups.Contains(u.ExternalSubjectId))).
+                                                        Select(r => r.RoleId)).Contains(x.Id)).Select(rn => rn.Name).ToList<string>();
+
+                if (rolesExternalIdp != null)
+                {
+                    foreach (var item in rolesExternalIdp)
+                    {
+                        context.IssuedClaims.Add(new Claim(_configuration["Settings:SynapseRolesClaimType"], item));
+                    }
+                }
+
+                foreach (var item in aadgroups)
+                {
+                    context.IssuedClaims.Add(new Claim(_configuration["Settings:AADGroupsClaimType"], item));
                 }
 
 

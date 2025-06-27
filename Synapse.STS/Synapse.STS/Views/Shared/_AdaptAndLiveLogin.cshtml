@@ -1,0 +1,65 @@
+﻿@*
+    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+*@
+@{
+    Layout = "~/Views/Shared/_AdaptAndLiveLayoutPage.cshtml";
+}
+@model LoginViewModel
+
+<div class="login-page">
+    @Html.Partial("_ValidationSummary")
+    <div id="dvCenter">
+        <div class="row" id="loginPage">
+            <div class="col-md-6" id="loginSection">
+                <div class="outrDv">
+                    <div class="inrDv">
+                        <img src="~/HilightLogo.png">
+                    </div>
+                </div>
+                <div class="outrDv">
+                    <div class="inrDv">
+                        <form asp-route="Login">
+                            <input type="hidden" asp-for="ReturnUrl" />
+                            <fieldset>
+                                <div class="form-group">
+                                    <label asp-for="Username" id="adaptAndLiveUserName"></label>
+                                    <input class="form-control" placeholder="Username" asp-for="Username" autofocus>
+                                </div>
+                                <div class="form-group">
+                                    <label asp-for="Password" id="adaptAndLivePassword"></label>
+                                    <input type="password" class="form-control" placeholder="Password" asp-for="Password" autocomplete="off">
+                                </div>
+                                <div class="form-group">
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <button class="btn btn-primary btn-block" id="btnLogin" name="button" value="login"><b>Login</b></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </fieldset>
+                        </form>
+                    </div>
+                </div>
+                <div class="outrDv" id="dvFacingIss">
+                    <div class="text-center inrDv">
+                        <span>Facing any trouble? <a href="https://interneuron.atlassian.net/servicedesk/customer/portal/2"><b>Contact Us</b></a></span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6" id="adaptAndLiveSection">
+                <div class="outerDv">
+                    <div class="text-center inrDv">
+                        <img class="icon" src="~/AdaptAndLiveLogo.png" width="75%" height="75%">
+                    </div>
+                </div>
+                <div class="outrDv">
+                    <div class="inrDv">
+                        <div class="text-center">
+                            <span>Brought to you by Adapt & Live. Powered by <a href="https://www.interneuron.com"><img src="~/InterneuronLogo.png" height="20px" /></a></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

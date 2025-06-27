@@ -38,16 +38,16 @@
 //along with this program.If not, see<http://www.gnu.org/licenses/>.
 
 
-using IdentityServer4.Services;
-using IdentityServer4.Stores;
+using Duende.IdentityServer.Services;
+using Duende.IdentityServer.Stores;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
-using IdentityServer4.Events;
-using IdentityServer4.Models;
+using Duende.IdentityServer.Events;
+using Duende.IdentityServer.Models;
 using Microsoft.AspNetCore.Identity;
-using IdentityServer4.Extensions;
+using Duende.IdentityServer.Extensions;
 using System.Security.Principal;
 using System.Security.Claims;
 using IdentityModel;
@@ -56,6 +56,8 @@ using System;
 using System.Collections.Generic;
 using Synapse.STS.Models;
 using System.IO;
+using Microsoft.Extensions.Configuration;
+using Duende.IdentityServer;
 
 namespace Synapse.STS.UI
 {
@@ -68,6 +70,7 @@ namespace Synapse.STS.UI
         private readonly IClientStore _clientStore;
         private readonly IAuthenticationSchemeProvider _schemeProvider;
         private readonly IEventService _events;
+        private readonly IConfiguration _configuration;
 
         public AccountController(
             UserManager<SynapseUser> userManager,
@@ -75,7 +78,8 @@ namespace Synapse.STS.UI
             IIdentityServerInteractionService interaction,
             IClientStore clientStore,
             IAuthenticationSchemeProvider schemeProvider,
-            IEventService events)
+            IEventService events,
+            IConfiguration configuration)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -83,6 +87,7 @@ namespace Synapse.STS.UI
             _clientStore = clientStore;
             _schemeProvider = schemeProvider;
             _events = events;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -98,6 +103,13 @@ namespace Synapse.STS.UI
             {
                 // we only have one option for logging in and it's an external provider
                 return await ExternalLogin(vm.ExternalLoginScheme, returnUrl);
+            }
+
+            var loginPageTemplateName = _configuration.GetValue<string>("LoginPageTemplate:Name");
+
+            if (loginPageTemplateName == "AdaptAndLive")
+            {
+                return View("_AdaptAndLiveLogin", vm);
             }
 
             return View(vm);
@@ -119,7 +131,8 @@ namespace Synapse.STS.UI
                     // if the user cancels, send a result back into IdentityServer as if they 
                     // denied the consent (even if this client does not require consent).
                     // this will send back an access denied OIDC error response to the client.
-                    await _interaction.GrantConsentAsync(context, ConsentResponse.Denied);
+                    //await _interaction.GrantConsentAsync(context, new ConsentResponse() { ErrorDescription = "Access Denied" });
+                    await _interaction.DenyAuthorizationAsync(context, AuthorizationError.AccessDenied);
 
                     // we can trust model.ReturnUrl since GetAuthorizationContextAsync returned non-null
                     return Redirect(model.ReturnUrl);
@@ -158,7 +171,7 @@ namespace Synapse.STS.UI
                 //// Step 3: Create the Application Cookie (8hr expiration)
                 //await _signInManager.SignInAsync(user, props);
 
-                var result = await _signInManager.PasswordSignInAsync(model.Username, model.Password, model.RememberLogin, lockoutOnFailure: false);
+                var result = await _signInManager.PasswordSignInAsync(model.Username, model.Password, model.RememberLogin, lockoutOnFailure: true);
                 if (result.Succeeded)
                 {
                     var user = await _userManager.FindByNameAsync(model.Username);
@@ -173,14 +186,29 @@ namespace Synapse.STS.UI
 
                     return Redirect("~/");
                 }
+                if (result.IsLockedOut)
+                {
+                    await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "Account is locked. Please try again after some time."));
+                    ModelState.AddModelError("", "Account is locked. Please try again after some time.");
+                }
+                else
+                {
+                    await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "invalid credentials"));
+                    ModelState.AddModelError("", AccountOptions.InvalidCredentialsErrorMessage);
+                }
 
-                await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "invalid credentials"));
-
-                ModelState.AddModelError("", AccountOptions.InvalidCredentialsErrorMessage);
             }
 
             // something went wrong, show form with error
             var vm = await BuildLoginViewModelAsync(model);
+
+            var loginPageTemplateName = _configuration.GetValue<string>("LoginPageTemplate:Name");
+
+            if (loginPageTemplateName == "AdaptAndLive")
+            {
+                return View("_AdaptAndLiveLogin", vm);
+            }
+
             return View(vm);
         }
 
@@ -218,7 +246,7 @@ namespace Synapse.STS.UI
         public async Task<IActionResult> ExternalLoginCallback()
         {
             // read external identity from the temporary cookie
-            var result = await HttpContext.AuthenticateAsync(IdentityServer4.IdentityServerConstants.ExternalCookieAuthenticationScheme);
+            var result = await HttpContext.AuthenticateAsync(Duende.IdentityServer.IdentityServerConstants.ExternalCookieAuthenticationScheme);
             if (result?.Succeeded != true)
             {
                 throw new Exception("External authentication error");
@@ -273,12 +301,22 @@ namespace Synapse.STS.UI
 
             var name = principal.FindFirst(JwtClaimTypes.Name)?.Value ?? user.Id;
             await _events.RaiseAsync(new UserLoginSuccessEvent(provider, providerUserId, user.Id, name));
-            await HttpContext.SignInAsync(user.Id, name, provider, localSignInProps, additionalLocalClaims.ToArray());
+            // await HttpContext.SignInAsync(user.Id, name, provider, localSignInProps, additionalLocalClaims.ToArray());
 
+            // issue authentication cookie for user
+            var isuser = new IdentityServerUser(user.Id)
+            {
+                DisplayName = name,
+                IdentityProvider = provider,
+                AdditionalClaims = additionalLocalClaims,
+
+            };
+
+            await HttpContext.SignInAsync(isuser, localSignInProps);
 
 
             // delete temporary cookie used during external authentication
-            await HttpContext.SignOutAsync(IdentityServer4.IdentityServerConstants.ExternalCookieAuthenticationScheme);
+            await HttpContext.SignOutAsync(Duende.IdentityServer.IdentityServerConstants.ExternalCookieAuthenticationScheme);
 
             // validate return URL and redirect back to authorization endpoint or a local page
             var returnUrl = result.Properties.Items["returnUrl"];
@@ -376,9 +414,9 @@ namespace Synapse.STS.UI
                 }).ToList();
 
             var allowLocal = true;
-            if (context?.ClientId != null)
+            if (context?.Client.ClientId != null)
             {
-                var client = await _clientStore.FindEnabledClientByIdAsync(context.ClientId);
+                var client = await _clientStore.FindEnabledClientByIdAsync(context.Client.ClientId);
                 if (client != null)
                 {
                     allowLocal = client.EnableLocalLogin;
@@ -449,21 +487,42 @@ namespace Synapse.STS.UI
             if (User?.Identity.IsAuthenticated == true)
             {
                 var idp = User.FindFirst(JwtClaimTypes.IdentityProvider)?.Value;
-                if (idp != null && idp != IdentityServer4.IdentityServerConstants.LocalIdentityProvider)
+                if (idp != null && idp != Duende.IdentityServer.IdentityServerConstants.LocalIdentityProvider)
                 {
-                    var providerSupportsSignout = await HttpContext.GetSchemeSupportsSignOutAsync(idp);
-                    if (providerSupportsSignout)
-                    {
-                        if (vm.LogoutId == null)
-                        {
-                            // if there's no current logout context, we need to create one
-                            // this captures necessary info from the current logged in user
-                            // before we signout and redirect away to the external IdP for signout
-                            vm.LogoutId = await _interaction.CreateLogoutContextAsync();
-                        }
 
-                        vm.ExternalAuthenticationScheme = idp;
+                    // var providerSupportsSignout = await _schemeProvider.GetSchemeSupportsSignOutAsync(idp);
+                    var authenticationScheme = await _schemeProvider.GetSchemeAsync(idp);
+                    if (authenticationScheme != null)
+                    {
+                        var handlerType = authenticationScheme.HandlerType;
+                        var supportsSignOut = typeof(IAuthenticationSignOutHandler).IsAssignableFrom(handlerType);
+
+                        if (supportsSignOut)
+                        {
+                            if (vm.LogoutId == null)
+                            {
+                                // if there's no current logout context, we need to create one
+                                // this captures necessary info from the current logged in user
+                                // before we signout and redirect away to the external IdP for signout
+                                vm.LogoutId = await _interaction.CreateLogoutContextAsync();
+                            }
+
+                            vm.ExternalAuthenticationScheme = idp;
+
+                        }
                     }
+                    //if (providerSupportsSignout)
+                    //{
+                    //    if (vm.LogoutId == null)
+                    //    {
+                    //        // if there's no current logout context, we need to create one
+                    //        // this captures necessary info from the current logged in user
+                    //        // before we signout and redirect away to the external IdP for signout
+                    //        vm.LogoutId = await _interaction.CreateLogoutContextAsync();
+                    //    }
+
+                    //    vm.ExternalAuthenticationScheme = idp;
+                    //}
                 }
             }
 
